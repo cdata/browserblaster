@@ -1,59 +1,127 @@
+/*
+	Copyright (c) <2011> <Erik Rothoff Andersson>
+	
+	This software is provided 'as-is', without any express or implied
+	warranty. In no event will the authors be held liable for any damages
+	arising from the use of this software.
+	
+	Permission is granted to anyone to use this software for any purpose,
+	including commercial applications, and to alter it and redistribute it
+	freely, subject to the following restrictions:
+	
+	1. The origin of this software must not be misrepresented; you must not
+	claim that you wrote the original software. If you use this software
+	in a product, an acknowledgment in the product documentation would be
+	appreciated but is not required.
+	
+	2. Altered source versions must be plainly marked as such, and must not be
+	misrepresented as being the original software.
+	
+	3. This notice may not be removed or altered from any source
+	distribution.
+*/
+
 (function() {
-function Asteroids() {
-	if ( ! window.ASTEROIDS )
-		window.ASTEROIDS = {
-			enemiesKilled: 0
-		};
-	
 	/*
-		Classes
+		Function:
+			Class
+		
+		Simple function to create MooTools-esque classes
 	*/
-	
-	function Vector(x, y) {
-		if ( typeof x == 'Object' ) {
-			this.x = x.x;
-			this.y = x.y;
-		} else {
-			this.x = x;
-			this.y = y;
-		}
+	var Class = function(methods) {
+		var ret = function() {
+			if ( methods && typeof methods.initialize == 'function' )
+				return methods.initialize.apply(this, arguments);
+		};
+		
+		for ( var key in methods ) if ( methods.hasOwnProperty(key) )
+			ret.prototype[key] = methods[key];
+		
+		return ret;
 	};
 	
-	Vector.prototype = {
+	if ( ! Array.prototype.indexOf ) {
+		// Found at: https://developer.mozilla.org/en/JavaScript/Reference/Global_Objects/Array/indexOf
+		Array.prototype.indexOf = function(searchElement) {
+			if (this === void 0 || this === null)
+				throw new TypeError();
+		
+			var t = Object(this);
+			var len = t.length >>> 0;
+			if (len === 0)
+				return -1;
+		
+			var n = 0;
+			if (arguments.length > 0) {
+				n = Number(arguments[1]);
+				if (n !== n) // shortcut for verifying if it's NaN
+					n = 0;
+				else if (n !== 0 && n !== (1 / 0) && n !== -(1 / 0))
+				n = (n > 0 || -1) * Math.floor(Math.abs(n));
+			}
+		
+			if (n >= len)
+				return -1;
+		
+			var k = n >= 0 ? n : Math.max(len - Math.abs(n), 0);
+		
+			for (; k < len; k++) {
+				if (k in t && t[k] === searchElement)
+					return k;
+			}
+			return -1;
+		};
+	}
+	
+	/*
+		== Classes ==
+	*/
+	
+	var Vector = new Class({
+		initialize: function(x, y) {
+			if ( typeof x == 'Object' ) {
+				this.x = x.x;
+				this.y = x.y;
+			} else {
+				this.x = x;
+				this.y = y;
+			}
+		},
+
 		cp: function() {
 			return new Vector(this.x, this.y);
 		},
-		
+
 		mul: function(factor) {
 			this.x *= factor;
 			this.y *= factor;
 			return this;
 		},
-		
+
 		mulNew: function(factor) {
 			return new Vector(this.x * factor, this.y * factor);
 		},
-		
+
 		add: function(vec) {
 			this.x += vec.x;
 			this.y += vec.y;
 			return this;
 		},
-		
+
 		addNew: function(vec) {
 			return new Vector(this.x + vec.x, this.y + vec.y);
 		},
-		
+
 		sub: function(vec) {
 			this.x -= vec.x;
 			this.y -= vec.y;
 			return this;
 		},
-		
+
 		subNew: function(vec) {
 			return new Vector(this.x - vec.x, this.y - vec.y);
 		},
-		
+
 		// angle in radians
 		rotate: function(angle) {
 			var x = this.x, y = this.y;
@@ -61,12 +129,12 @@ function Asteroids() {
 			this.y = x * Math.sin(angle) + Math.cos(angle) * y;
 			return this;
 		},
-		
+
 		// angle still in radians
 		rotateNew: function(angle) {
 			return this.cp().rotate(angle);
 		},
-		
+
 		// angle in radians... again
 		setAngle: function(angle) {
 			var l = this.len();
@@ -74,361 +142,144 @@ function Asteroids() {
 			this.y = Math.sin(angle) * l;
 			return this;
 		},
-		
+
 		// RADIANS
 		setAngleNew: function(angle) {
 			return this.cp().setAngle(angle);
 		},
-		
+
 		setLength: function(length) {
 			var l = this.len();
 			if ( l ) this.mul(length / l);
 			else this.x = this.y = length;
 			return this;
 		},
-		
+
 		setLengthNew: function(length) {
 			return this.cp().setLength(length);
 		},
-		
+
 		normalize: function() {
 			var l = this.len();
+			if ( l == 0 )
+				return this;
 			this.x /= l;
 			this.y /= l;
 			return this;
 		},
-		
+
 		normalizeNew: function() {
 			return this.cp().normalize();
 		},
-		
+
 		angle: function() {
 			return Math.atan2(this.y, this.x);
 		},
-		
+
 		collidesWith: function(rect) {
 			return this.x > rect.x && this.y > rect.y && this.x < rect.x + rect.width && this.y < rect.y + rect.height;
 		},
-		
+
 		len: function() {
 			var l = Math.sqrt(this.x * this.x + this.y * this.y);
 			if ( l < 0.005 && l > -0.005) return 0;
 			return l;
 		},
-		
+
 		is: function(test) {
-		
 			return typeof test == 'object' && this.x == test.x && this.y == test.y;
 		},
 		
+		dot: function(v2) {
+			return this.x * v2.x + this.y * v2.y;
+		},
+
 		toString: function() {
 			return '[Vector(' + this.x + ', ' + this.y + ') angle: ' + this.angle() + ', length: ' + this.len() + ']';
 		}
-	};
-	
-	function Line(p1, p2) {
-		this.p1 = p1;
-		this.p2 = p2;
-	};
-	
-	Line.prototype = {
-		shift: function(pos) {
-			this.p1.add(pos);
-			this.p2.add(pos);
-		},
-		
-		intersectsWithRect: function(rect) {
-			var LL = new Vector(rect.x, rect.y + rect.height);
-			var UL = new Vector(rect.x, rect.y);
-			var LR = new Vector(rect.x + rect.width, rect.y + rect.height);
-			var UR = new Vector(rect.x + rect.width, rect.y);
-			
-			if (
-				this.p1.x > LL.x && this.p1.x < UR.x && this.p1.y < LL.y && this.p1.y > UR.y &&
-				this.p2.x > LL.x && this.p2.x < UR.x && this.p2.y < LL.y && this.p2.y > UR.y
-			) return true;
-
-			if ( this.intersectsLine(new Line(UL, LL)) ) return true;
-			if ( this.intersectsLine(new Line(LL, LR)) ) return true;
-			if ( this.intersectsLine(new Line(UL, UR)) ) return true;
-			if ( this.intersectsLine(new Line(UR, LR)) ) return true;
-			return false;
-		},
-		
-		intersectsLine: function(line2) {
-			var v1 = this.p1, v2 = this.p2;
-			var v3 = line2.p1, v4 = line2.p2;
-			
-			var denom = ((v4.y - v3.y) * (v2.x - v1.x)) - ((v4.x - v3.x) * (v2.y - v1.y));
-			var numerator = ((v4.x - v3.x) * (v1.y - v3.y)) - ((v4.y - v3.y) * (v1.x - v3.x));
-		
-			var numerator2 = ((v2.x - v1.x) * (v1.y - v3.y)) - ((v2.y - v1.y) * (v1.x - v3.x));
-			
-			if ( denom == 0.0 ) {
-				return false;
-			}
-			var ua = numerator / denom;
-			var ub = numerator2 / denom;
-			
-			return (ua >= 0.0 && ua <= 1.0 && ub >= 0.0 && ub <= 1.0);
-		}
-	};
-	
-	/*function Highscores() {
-		var w = (document.clientWidth || window.innerWidth);
-		var h = (document.clientHeight || window.innerHeight);
-		
-		this.container = document.createElement('div');
-		this.container.className = "ASTEROIDSYEAH";
-		with ( this.container.style ) {
-			position = "fixed";
-			top = (h / 2 - 250) + "px";
-			left = (w / 2 - 250) + "px";
-			width = "500px";
-			height = "500px";
-			MozBoxShadow = WebkitBoxShadow = "0 0 25px #000";
-			zIndex = "10002";
-		};
-		document.body.appendChild(this.container);
-		
-		// Create iframe
-		this.iframe = document.createElement('iframe');
-		this.iframe.className = "ASTEROIDSYEAH";
-		this.iframe.width = this.iframe.height = 500;
-		this.iframe.src = highscoreURL;
-		this.iframe.frameBorder = 0;
-		this.container.appendChild(this.iframe);
-		
-		// Create close button
-		this.close = document.createElement('a');
-		this.close.href = "#";
-		this.close.onclick = function() {
-			that.highscores.hide();
-		};
-		this.close.innerHTML = "X";
-		with ( this.close.style ) {
-			position = "absolute";
-			display = "block";
-			width = "24px";
-			height = "24px";
-			top = "-12px";
-			right = "-12px";
-			background = "url(" + closeURL + ")";
-			textIndent = "-10000px";
-			outline = "none";
-			textDecoration = "none";
-			fontFamily = "Arial";
-			zIndex = "10003";
-		}
-		this.container.appendChild(this.close);
-	};
-	
-	Highscores.prototype = {
-		show: function() {
-			this.container.style.display = "block";
-			this.sendScore();
-		},
-		
-		hide: function() {
-			this.container.style.display = "none";
-		},
-		
-		sendScore: function() {
-			this.iframe.src = highscoreURL + "#" + (that.enemiesKilled * 10) + ":" + escape(document.location.href);
-		}
-	};*/
+	});
 	
 	/*
-		end classes, begin code
+		Class:
+			Rect
+		
+		Represents a rectangle at a given point. Uses Vector for positioning
 	*/
 	
-	var that = this;
+	var Rect = new Class({
+		initialize: function(x, y, w, h) {
+			this.pos = new Vector(x, y);
+			this.size = {width: w, height: h};
+		},
+		
+		getRight: function() {
+			return this.pos.x + this.size.width/2;
+		},
+		
+		getBottom: function() {
+			return this.pos.y + this.size.height/2;
+		}
+	});
 	
-	var isIE = !!window.ActiveXObject; // IE gets less performance-intensive
-	var isIEQuirks = isIE && document.compatMode == "BackCompat";
+	/*
+		== Utility functions ==
+	*/
 	
-	// configuration directives are placed in local variables
-	var w = document.documentElement.clientWidth, h = document.documentElement.clientHeight;
-	if ( isIEQuirks ) {
-		w = document.body.clientWidth;
-		h = document.body.clientHeight;
+	/*
+		Function:
+			now
+			
+		Returns the current time in milliseconds
+	*/
+	
+	function now() {
+		return (new Date()).getTime();
 	}
 	
-	var playerWidth = 20, playerHeight = 30;
-	
-	var playerVerts = [[-1 * playerHeight/2, -1 * playerWidth/2], [-1 * playerHeight/2, playerWidth/2], [playerHeight/2, 0]];
-	
-	var ignoredTypes = ['HTML', 'HEAD', 'BODY', 'SCRIPT', 'TITLE', 'META', 'STYLE', 'LINK'];
-	if ( window.ActiveXObject )
-		ignoredTypes = ['HTML', 'HEAD', 'BODY', 'SCRIPT', 'TITLE', 'META', 'STYLE', 'LINK', 'SHAPE', 'LINE', 'GROUP', 'IMAGE', 'STROKE', 'FILL', 'SKEW', 'PATH', 'TEXTPATH', 'INS']; // Half of these are for IE g_vml
-	var hiddenTypes = ['BR', 'HR'];
-	
-	var FPS = 50;
-	
-	// units/second
-	var acc			  = 300;
-	var maxSpeed	  = 600;
-	var rotSpeed	  = 360; // one rotation per second
-	var bulletSpeed	  = 700;
-	var particleSpeed = 400;
-	
-	var timeBetweenFire = 150; // how many milliseconds between shots
-	var timeBetweenBlink = 250; // milliseconds between enemy blink
-	var timeBetweenEnemyUpdate = isIE ? 10000 : 2000;
-	var bulletRadius = 2;
-	var maxParticles = isIE ? 20 : 40;
-	var maxBullets = isIE ? 10 : 20;
-	
-	/*var highscoreURL = "http://asteroids.glonk.se/highscores.html";
-	var closeURL = "http://asteroids.glonk.se/close.png";*/
-	
-	// generated every 10 ms
-	this.flame = {r: [], y: []};
-	
-	// blink style
-	this.toggleBlinkStyle = function () {
-		if (this.updated.blink.isActive) {
-			removeClass(document.body, 'ASTEROIDSBLINK');
-		} else {
-			addClass(document.body, 'ASTEROIDSBLINK');
-		}
-
-		this.updated.blink.isActive = !this.updated.blink.isActive;
-	};
-
-	addStylesheet(".ASTEROIDSBLINK .ASTEROIDSYEAHENEMY", "outline: 2px dotted red;");
-	
-	this.pos = new Vector(100, 100);
-	this.lastPos = false;
-	this.vel = new Vector(0, 0);
-	this.dir = new Vector(0, 1);
-	this.keysPressed = {};
-	this.firedAt = false;
-	this.updated = {
-		enemies: false, // if the enemy index has been updated since the user pressed B for Blink
-		flame: new Date().getTime(), // the time the flame was last updated
-		blink: {time: 0, isActive: false}
-	};
-	this.scrollPos = new Vector(0, 0);
-	
-	this.bullets = [];
-	
-	// Enemies lay first in this.enemies, when they are shot they are moved to this.dying
-	this.enemies = [];
-	this.dying = [];
-	this.totalEnemies = 0;
-	
-	// Particles are created when something is shot
-	this.particles = [];
-	
-	// things to shoot is everything textual and an element of type not specified in types AND not a navigation element (see further down)
-	function updateEnemyIndex() {
-		for ( var i = 0, enemy; enemy = that.enemies[i]; i++ )
-			removeClass(enemy, "ASTEROIDSYEAHENEMY");
-			
-		var all = document.body.getElementsByTagName('*');
-		that.enemies = [];
-		for ( var i = 0, el; el = all[i]; i++ ) {
-			// elements with className ASTEROIDSYEAH are part of the "game"
-			if ( indexOf(ignoredTypes, el.tagName.toUpperCase()) == -1 && el.prefix != 'g_vml_' && hasOnlyTextualChildren(el) && el.className != "ASTEROIDSYEAH" && el.offsetHeight > 0 ) {
-				el.aSize = size(el);
-				that.enemies.push(el);
-				
-				addClass(el, "ASTEROIDSYEAHENEMY");
-				
-				// this is only for enemycounting
-				if ( ! el.aAdded ) {
-					el.aAdded = true;
-					that.totalEnemies++;
-				}
-			}
-		}
-	};
-	updateEnemyIndex();
-	
-	// createFlames create the vectors for the flames of the ship
-	var createFlames;
-	(function () {
-		var rWidth = playerWidth,
-			rIncrease = playerWidth * 0.1,
-			yWidth = playerWidth * 0.6,
-			yIncrease = yWidth * 0.2,
-			halfR = rWidth / 2,
-			halfY = yWidth / 2,
-			halfPlayerHeight = playerHeight / 2;
-
-		createFlames = function () {
-			// Firstly create red flames
-			that.flame.r = [[-1 * halfPlayerHeight, -1 * halfR]];
-			that.flame.y = [[-1 * halfPlayerHeight, -1 * halfY]];
-
-			for ( var x = 0; x < rWidth; x += rIncrease ) {
-				that.flame.r.push([-random(2, 7) - halfPlayerHeight, x - halfR]);
-			}
-
-			that.flame.r.push([-1 * halfPlayerHeight, halfR]);
-			
-			// ... And now the yellow flames
-			for ( var x = 0; x < yWidth; x += yIncrease ) {
-				that.flame.y.push([-random(2, 7) - halfPlayerHeight, x - halfY]);
-			}
-
-			that.flame.y.push([-1 * halfPlayerHeight, halfY]);
-		};
-	})();
-	
-	createFlames();
-	
 	/*
-		Math operations
-	*/
-	
-	function radians(deg) {
-		return deg * 0.0174532925;
-	};
-	
-	function degrees(rad) {
-		return rad * 57.2957795;
-	};
-	
-	function random(from, to) {
-		return Math.floor(Math.random() * (to + 1) + from);
-	};
-	
-	/*
-		Misc operations
-	*/
-	
-	function code(name) {
-		var table = {'up': 38, 'down': 40, 'left': 37, 'right': 39, 'esc': 27};
-		if ( table[name] ) return table[name];
-		return name.charCodeAt(0);
-	};
-	
-	function boundsCheck(vec) {
-		if ( vec.x > w )
-			vec.x = 0;
-		else if ( vec.x < 0 )
-			vec.x = w;
+		Function:
+			bind
 		
-		if ( vec.y > h )
-			vec.y = 0;
-		else if ( vec.y < 0 )
-			vec.y = h;	
-	};
+		Bind the <this> variable in a function call
+	*/
 	
-	function size(element) {
-		var el = element, left = 0, top = 0;
-		do {
-			left += el.offsetLeft || 0;
-			top += el.offsetTop || 0;
-			el = el.offsetParent;
-		} while (el);
-		return {x: left, y: top, width: element.offsetWidth || 10, height: element.offsetHeight || 10};
-	};
+	function bind(bound, func) {
+		return function() {
+			return func.apply(bound, arguments);
+		}
+	}
 	
-	// Taken from:
-	// http://www.quirksmode.org/blog/archives/2005/10/_and_the_winner_1.html
+	/*
+		Function:
+			each
+		
+		Call a function on an every indice of an array.
+	*/
+	
+	function each(arr, func, bindObject) {
+		// This is the same function as the native Array.prototype.forEach
+		if ( typeof arr.forEach == 'function' )
+			return arr.forEach(func, bindObject);
+		
+		for ( var key in arr ) if ( arr.hasOwnProperty(key) ) 
+			func.call(bindObject || window, arr[key], key);
+	}
+	
+	/*
+		Function:
+			addEvent
+		
+		Add event to given element. Works cross browser, adding multiple events
+		is possible.
+		
+		Taken from: http://www.quirksmode.org/blog/archives/2005/10/_and_the_winner_1.html
+		
+		Parameters:
+			(element) obj - The element to add events to
+			(string) type - The type of event, e.g. "click", "keydown"
+			(function) fn - The function to call upon the event
+	*/
+	
 	function addEvent( obj, type, fn ) {
 		if (obj.addEventListener)
 			obj.addEventListener( type, fn, false );
@@ -438,6 +289,18 @@ function Asteroids() {
 			obj.attachEvent( "on"+type, obj[type+fn] );
 		}
 	}
+	
+	/*
+		Function:
+			removeEvent
+		
+		Remove events added by addEvent.
+		
+		Parameters:
+			(element) obj - The element to remove events from
+			(string) type - The type of event, e.g. "click", "keydown"
+			(function) fn - The function to remove
+	*/
 
 	function removeEvent( obj, type, fn ) {
 		if (obj.removeEventListener)
@@ -449,699 +312,1496 @@ function Asteroids() {
 		}
 	}
 	
-	function arrayRemove(array, from, to) {
-		var rest = array.slice((to || from) + 1 || array.length);
-		array.length = from < 0 ? array.length + from : from;
-		return array.push.apply(array, rest);
-	};
-	
-	function applyVisibility(vis) {
-		for ( var i = 0, p; p = window.ASTEROIDSPLAYERS[i]; i++ ) {
-			p.gameContainer.style.visibility = vis;
-		}
-	}
-	
-	function getElementFromPoint(x, y) {
-		// hide canvas so it isn't picked up
-		applyVisibility('hidden');
-
-		var element = document.elementFromPoint(x, y);
-
-		if ( ! element ) {
-			applyVisibility('visible');
-			return false;
-		}
-
-		if ( element.nodeType == 3 )
-			element = element.parentNode;
-
-		// show the canvas again, hopefully it didn't blink
-		applyVisibility('visible');
-		return element;
-	};
-	
-	function addParticles(startPos) {
-		var time = new Date().getTime();
-		var amount = maxParticles;
-		for ( var i = 0; i < amount; i++ ) {
-			that.particles.push({
-				// random direction
-				dir: (new Vector(Math.random() * 20 - 10, Math.random() * 20 - 10)).normalize(),
-				pos: startPos.cp(),
-				cameAlive: time
-			});
-		}
-	};
-	
-	function setScore() {
-		that.points.innerHTML = window.ASTEROIDS.enemiesKilled * 10;
-	};
-	
-	function hasOnlyTextualChildren(element) {
-		if ( element.offsetLeft < -100 && element.offsetWidth > 0 && element.offsetHeight > 0 ) return false;
-		if ( indexOf(hiddenTypes, element.tagName) != -1 ) return true;
+	/*
+		Function:
+			elementIsContainedIn
 		
-		if ( element.offsetWidth == 0 && element.offsetHeight == 0 ) return false;
-		for ( var i = 0; i < element.childNodes.length; i++ ) {
-			// <br /> doesn't count... and empty elements
-			if (
-				indexOf(hiddenTypes, element.childNodes[i].tagName) == -1
-				&& element.childNodes[i].childNodes.length != 0
-			) return false;
-		}
-		return true;
-	};
+		Check if the element1 contains the element2
+		
+		Parameters:
+			(element) element1 - The element to check if it HAS the element2
+			(element) element2 - The element to check if it is INSIDE element1
+	*/
 	
-	function indexOf(arr, item, from){
-		if ( arr.indexOf ) return arr.indexOf(item, from);
-		var len = arr.length;
-		for (var i = (from < 0) ? Math.max(0, len + from) : from || 0; i < len; i++){
-			if (arr[i] === item) return i;
-		}
-		return -1;
-	};
-	
-	// taken from MooTools Core
-	function addClass(element, className) {
-		if ( element.className.indexOf(className) == -1)
-			element.className = (element.className + ' ' + className).replace(/\s+/g, ' ').replace(/^\s+|\s+$/g, '');
-	};
-	
-	// taken from MooTools Core
-	function removeClass(element, className) {
-		element.className = element.className.replace(new RegExp('(^|\\s)' + className + '(?:\\s|$)'), '$1');
-	};
-	
-	function addStylesheet(selector, rules) {
-		var stylesheet = document.createElement('style');
-		stylesheet.type = 'text/css';
-		stylesheet.rel = 'stylesheet';
-		stylesheet.id = 'ASTEROIDSYEAHSTYLES';
-		try {
-			stylesheet.innerHTML = selector + "{" + rules + "}";
-		} catch ( e ) {
-			stylesheet.styleSheet.addRule(selector, rules);
-		}
-		document.getElementsByTagName("head")[0].appendChild(stylesheet);
-	};
-	
-	function removeStylesheet(name) {
-		var stylesheet = document.getElementById(name);
-		if ( stylesheet ) {
-			stylesheet.parentNode.removeChild(stylesheet);
-		}
+	function elementIsContainedIn(element1, element2) {
+		if ( element.contains )
+			return element1.contains(element2);
+		return !!(element1.compareDocumentPosition(element2) & 16);
 	};
 	
 	/*
-		== Setup ==
+		Function:
+			code
+		
+		Turn a key code into it's corresponding string value.
+		
+		Parameters:
+			(number) name - The keycode
+		
+		Returns:
+			The string value. For up/down/left/right/esc-button it will return that.
+			Note that for letters it will be in it's capitalised form
 	*/
-	this.gameContainer = document.createElement('div');
-	this.gameContainer.className = 'ASTEROIDSYEAH';
-	document.body.appendChild(this.gameContainer);
 	
-	this.canvas = document.createElement('canvas');
-	this.canvas.setAttribute('width', w);
-	this.canvas.setAttribute('height', h);
-	this.canvas.className = 'ASTEROIDSYEAH';
-	with ( this.canvas.style ) {
-		width = w + "px";
-		height = h + "px";
-		position = "fixed";
-		top = "0px";
-		left = "0px";
-		bottom = "0px";
-		right = "0px";
-		zIndex = "10000";
-	}
+	function code(name) {
+		var table = {38: 'up', 40: 'down', 37: 'left', 39: 'right', 27: 'esc'};
+		if ( table[name] ) return table[name];
+		return String.fromCharCode(name);
+	};
 	
-	// Is IE
-	if ( typeof G_vmlCanvasManager != 'undefined' ) {
-		this.canvas = G_vmlCanvasManager.initElement(this.canvas);
-		if ( ! this.canvas.getContext ) {
-			alert("So... you're using IE?  Please join me at http://github.com/erkie/erkie.github.com if you think you can help");
-		}
-	} else {
-		if ( ! this.canvas.getContext ) {
-			alert('This program does not yet support your browser. Please join me at http://github.com/erkie/erkie.github.com if you think you can help');
-		}
-	}
-	
-	addEvent(this.canvas, 'mousedown', function(e) {
-		e = e || window.event;
-		var message = document.createElement('span');
-		message.style.position = 'absolute';
-		message.style.border = '1px solid #999';
-		message.style.background = 'white';
-		message.style.color = "black";
-		message.innerHTML = 'Press Esc to quit';
-		document.body.appendChild(message);
+	/*
+		Function:
+			random
 		
-		var x = e.pageX || (e.clientX + document.documentElement.scrollLeft);
-		var y = e.pageY || (e.clientY + document.documentElement.scrollTop);
-		message.style.left = x - message.offsetWidth/2 + 'px';
-		message.style.top = y - message.offsetHeight/2 + 'px';
+		Generate a random number in the range ''' from <= x <= to '''.
 		
-		setTimeout(function() {
-			try {
-				message.parentNode.removeChild(message);
-			} catch ( e ) {}
-		}, 1000);
-	});
+		Parameters:
+			(number) from - The starting point
+			(number) to - The end point
+	*/
 	
-	var eventResize = function() {
-		if ( ! isIE ) {
-			that.canvas.style.display = "none";
+	function random(from, to) {
+		return Math.floor(Math.random() * (to + 1) + from);
+	};
+	
+	/*
+		Class:
+			KickAss
+		
+		The main entry point for the game
+	*/
+	
+	var KickAss = new Class({
+		initialize: function() {
+			// Holds all the player instances
+			this.players = [];
 			
-			w = document.documentElement.clientWidth;
-			h = document.documentElement.clientHeight;
+			// Holds an array of elements related to this game
+			// this should maybe be replaced with something wiser
+			this.elements = [];
 			
-			that.canvas.setAttribute('width', w);
-			that.canvas.setAttribute('height', h);
+			// The manager of bullets
+			this.bulletManager = new BulletManager();
+			this.bulletManager.game = this;
 			
-			with ( that.canvas.style ) {
-				display = "block";
-				width = w + "px";
-				height = h + "px";
+			// The manager of explosions
+			this.explosionManager = new ExplosionManager();
+			this.explosionManager.game = this;
+			
+			// Manager for menus
+			this.menuManager = new MenuManager();
+			this.menuManager.game = this;
+			this.menuManager.create();
+			
+			// Time of last game loop run
+			this.lastUpdate = now();
+			
+			// A map of keys that are pressed
+			this.keyMap = {};
+			
+			// Bind global events
+			this.keydownEvent = bind(this, this.keydown);
+			this.keyupEvent = bind(this, this.keyup);
+			
+			addEvent(document, 'keydown', this.keydownEvent);
+			addEvent(document, 'keyup', this.keyupEvent);
+			addEvent(document, 'keypress', this.keydownEvent);
+			
+			// We keep track of scrolling information and window size
+			this.scrollPos = new Vector(0, 0);
+			this.windowSize = {width: 0, height: 0};
+			
+			this.updateWindowInfo();
+		},
+		
+		begin: function() {
+			// Add first player
+			this.addPlayer();
+			
+			// Begin loop
+			this.loopTimer = window.setInterval(bind(this, this.loop), 1000/60);
+		},
+		
+		keydown: function(e) {
+			var c = code(e.keyCode);
+			this.keyMap[c] = true;
+			
+			switch ( c) {
+				// These events should be stopped
+				case 'left':
+				case 'right':
+				case 'up':
+				case 'down':
+				case 'esc':
+				case ' ':
+					if ( e.stopPropogation )
+						e.stopPropogation();
+					if ( e.preventDefault )
+						e.preventDefault();
+					e.returnValue = false;
+				break;
 			}
-		} else {
-			w = document.documentElement.clientWidth;
-			h = document.documentElement.clientHeight;
+			
+			switch ( c ) {
+				case 'esc':
+					this.destroy();
+					break;
+			}
+		},
+		
+		keyup: function(e) {
+			var c = code(e.keyCode);
+			this.keyMap[c] = false;
+			
+			switch ( c ) {
+				// These events should be stopped
+				case 'left':
+				case 'right':
+				case 'up':
+				case 'down':
+				case 'esc':
+				case ' ':
+					if ( e.stopPropogation )
+						e.stopPropogation();
+					if ( e.preventDefault )
+						e.preventDefault();
+					e.returnValue = false;
+				break;
+			}
+		},
+		
+		/*
+			Method:
+				loop
+			
+			This is the game loop, subsequently, the most important part of the game.
+			Takes care of updating everything, and seeing to that everything is drawn 
+			as it should be.
+		*/
+		
+		loop: function() {
+			var currentTime = now();
+			var tdelta = (currentTime - this.lastUpdate)/1000;
+			
+			this.updateWindowInfo();
+			
+			// Update every player
+			for ( var i = 0, player; player = this.players[i]; i++ )
+				player.update(tdelta);
+			
+			// Update bullets
+			this.bulletManager.update(tdelta);
+			
+			// Update explosions
+			this.explosionManager.update(tdelta);
+			
+			this.lastUpdate = currentTime;
+		},
+		
+		/*
+			Method:
+				addPlayer
+			
+			Adds a player controled by the user. For mega mayhem.
+		*/
+		
+		addPlayer: function() {
+			var player = new Player();
+			player.game = this;
+			
+			this.players.push(player);
+			
+			this.explosionManager.addExplosion(player.pos);
+		},
+		
+		/*
+			Method:
+				registerElement
+			
+			Register a DOM-element that belongs to the game
+			
+			Parameters:
+				(element) el - The element to register. It should have the classname "KICKASSELEMENT"
+								to avoid confusion
+		*/
+		
+		registerElement: function(el) {
+			this.elements.push(el);
+		},
+		
+		/*
+			Method:
+				unregisterElement
+			
+			Remove an element registered with <registerElement>
+			
+			Parameters: See KickAss.registerElement
+		*/
+		
+		unregisterElement: function(el) {
+			this.elements.splice(this.elements.indexOf(el), 1);
+		},
+		
+		/*
+			Method:
+				isKickAssElement
+			
+			Check if the passed element is child of a registered element.
+			
+			Parameters:
+				(element) el - The element to check
+		*/
+		
+		isKickAssElement: function(el) {
+			for ( var i = 0, element; element = this.elements[i]; i++ ) {
+				if ( el === element || elementIsContainedIn(element, el) )
+					return true;
+			}
+			return false;
+		},
+		
+		/*
+			Method:
+				isKeyPressed
+			
+			Check wether a key is pressed.
+			
+			Parameters:
+				(string) key - The key to be checked if it's pressed
+			
+			Return:
+				bool - True if it's pressed
+		*/
+		
+		isKeyPressed: function(key) {
+			return !! this.keyMap[key];
+		},
+		
+		/*
+			Method:
+				updateWindowInfo
+			
+			Update information regarding the window, scroll position and size.
+		*/
+		
+		updateWindowInfo: function() {
+			var isIEQuirks = (!!window.ActiveXObject) && document.compatMode == "BackCompat";
+			
+			this.windowSize = {
+				width: document.documentElement.clientWidth,
+				height: document.documentElement.clientHeight
+			};
 			
 			if ( isIEQuirks ) {
-				w = document.body.clientWidth;
-				h = document.body.clientHeight;
+				this.windowSize.width = document.body.clientWidth;
+				this.windowSize.height = document.body.clientHeight;
 			}
 			
-			that.canvas.setAttribute('width', w);
-			that.canvas.setAttribute('height', h);
-		}
-	};
-	addEvent(window, 'resize', eventResize);
-	
-	this.gameContainer.appendChild(this.canvas);
-	this.ctx = this.canvas.getContext("2d");
-	
-	this.ctx.fillStyle = "black";
-	this.ctx.strokeStyle = "black";
-	
-	// navigation wrapper element
-	if ( ! document.getElementById('ASTEROIDS-NAVIGATION') ) {
-		this.navigation = document.createElement('div');
-		this.navigation.id = "ASTEROIDS-NAVIGATION";
-		this.navigation.className = "ASTEROIDSYEAH";
-		with ( this.navigation.style ) {
-			fontFamily = "Arial,sans-serif";
-			position = "fixed";
-			zIndex = "10001";
-			bottom = "10px";
-			right = "10px";
-			textAlign = "right";
-		}
-		this.navigation.innerHTML = "(press esc to quit) ";
-		this.gameContainer.appendChild(this.navigation);
+			this.scrollPos.x = window.pageXOffset || document.documentElement.scrollLeft;
+			this.scrollPos.y = window.pageYOffset || document.documentElement.scrollTop;
+		},
 		
-		// points
-		this.points = document.createElement('span');
-		this.points.id = 'ASTEROIDS-POINTS';
-		this.points.style.font = "28pt Arial, sans-serif";
-		this.points.style.fontWeight = "bold";
-		this.points.className = "ASTEROIDSYEAH";
-		this.navigation.appendChild(this.points);
+		/*
+			Method:
+				hideAll
+			
+			Hide everything related to Kick ass. This will be everything that has the
+			classname "KICKASSELEMENT".
+		*/
 		
-		this.appstore = document.createElement('div');
-		with ( this.appstore.style ) {
-			position = 'absolute';
-			top = '10px';
-			right = '10px';
-			zIndex = '9999999';
-		}
-		this.appstore.innerHTML = '<a href="http://itunes.apple.com/us/app/kick-ass-destroy-the-web/id436623109?mt=8&ls=1"><img src="http://erkie.github.com/appstore.png" style="border: none" alt="Get the mobile version" /></a>';
-		document.body.appendChild(this.appstore);
+		hideAll: function() {
+			for ( var i = 0, el; el = this.elements[i]; i++ )
+				el.style.visibility = 'hidden';
+		},
 		
-		// fb like box
-		this.fbLike = document.createElement('div');
-		this.fbLike.innerHTML = '<iframe src="http://www.facebook.com/plugins/likebox.php?href=http%3A%2F%2Fwww.facebook.com%2Fpages%2FKick-Ass-Destroy-the-web%2F168200253236727&amp;width=292&amp;colorscheme=light&amp;show_faces=false&amp;stream=false&amp;header=false&amp;height=62" scrolling="no" frameborder="0" style="border:none; overflow:hidden; width:330px; height:70px;" allowTransparency="true"></iframe>';
-		this.navigation.appendChild(this.fbLike);
-	} else {
-		this.navigation = document.getElementById('ASTEROIDS-NAVIGATION');
-		this.points = document.getElementById('ASTEROIDS-POINTS');
-	}
-	
-	// Because IE quirks does not understand position: fixed we set to absolute and just reposition it everything frame
-	if ( isIEQuirks ) {
-		this.gameContainer.style.position =
-			this.canvas.style.position =
-			this.navigation.style.position 
-				= "absolute";
-	}
-	
-	setScore();
-	
-	// highscore link
-	/*this.highscoreLink = document.createElement('a');
-	this.highscoreLink.className = "ASTEROIDSYEAH";
-	this.highscoreLink.style.display = "block";
-	this.highscoreLink.href = '#';
-	this.highscoreLink.innerHTML = "Help/Submit highscore?";
-	this.navigation.appendChild(this.highscoreLink);
-	
-	this.highscoreLink.onclick = function() {
-		if ( ! that.highscores ) {
-			that.highscores = new Highscores();
+		/*
+			Method:
+				showAll
+			
+			This shows everything hidden by hideAll.
+		*/
+		
+		showAll: function() {
+			for ( var i = 0, el; el = this.elements[i]; i++ )
+				el.style.visibility = 'visible';
+		},
+		
+		/*
+			Method:
+				destroy
+			
+			Remove every trace of Kick Ass.
+		*/
+		
+		destroy: function() {
+			// Remove global events
+			removeEvent(document, 'keydown', this.keydownEvent);
+			removeEvent(document, 'keypress', this.keydownEvent);
+			removeEvent(document, 'keyup', this.keyupEvent);
+			
+			// Destroy everything
+			for ( var i = 0, player; player = this.players[i]; i++ )
+				player.destroy();
+			
+			this.bulletManager.destroy();
+			this.explosionManager.destroy();
+			this.menuManager.destroy();
+			
+			// Stop game timer
+			clearInterval(this.loopTimer);
 		}
-		that.highscores.show();
-		return false;
-	};*/
-	
-	// For ie
-	if ( typeof G_vmlCanvasManager != 'undefined' ) {
-		var children = this.canvas.getElementsByTagName('*');
-		for ( var i = 0, c; c = children[i]; i++ )
-			addClass(c, 'ASTEROIDSYEAH');
-	}
+	});
 	
 	/*
-		== Events ==
+		Class:
+			MenuManager
+		
+		Manages anything that resembles a menu. Points, "Press esc to quit".
 	*/
 	
-	var eventKeydown = function(event) {
-		event = event || window.event;
-		that.keysPressed[event.keyCode] = true;
+	var MenuManager = new Class({
+		initialize: function() {
+			this.numPoints = 0;
+		},
 		
-		switch ( event.keyCode ) {
-			case code(' '):
-				that.firedAt = 1;
-			break;
-		}
+		create: function() {
+			// Container 
+			this.container = document.createElement('div');
+			this.container.className = 'KICKASSELEMENT';
+			
+			with ( this.container.style ) {
+				position = 'fixed';
+				bottom = '20px';
+				right = '20px';
+				font = '16pt Arial';
+				color = 'black';
+				zIndex = '1000000';
+				textAlign = 'right';
+			}
+			document.body.appendChild(this.container);
+			
+			// Points view
+			this.points = document.createElement('div');
+			this.points.className = 'KICKASSELEMENT';
+			this.points.style.fontSize = '30pt';
+			this.points.innerHTML = this.numPoints;
+			this.container.appendChild(this.points);
+			
+			// Esc to quit text
+			this.escToQuit = document.createElement('div');
+			this.escToQuit.className = 'KICKASSELEMENT';
+			this.escToQuit.innerHTML = 'Press esc to quit';
+			this.container.appendChild(this.escToQuit);
+			
+			this.game.registerElement(this.container);
+			this.game.registerElement(this.points);
+			this.game.registerElement(this.escToQuit);
+		},
 		
-		// check here so we can stop propagation appropriately
-		if ( indexOf([code('up'), code('down'), code('right'), code('left'), code(' '), code('B'), code('W'), code('A'), code('S'), code('D')], event.keyCode) != -1 ) {
-			if ( event.preventDefault )
-				event.preventDefault();
-			if ( event.stopPropagation)
-				event.stopPropagation();
-			event.returnValue = false;
-			event.cancelBubble = true;
-			return false;
+		/*
+			Method:
+				addPoints
+			
+			Add points to the scorecard.
+			
+			Parameters:
+				(int) killed - The number of points killed in 
+		*/
+		
+		addPoints: function(killed) {
+			this.numPoints += killed*10;
+			this.points.innerHTML = this.numPoints;
+		},
+		
+		destroy: function() {
+			this.game.unregisterElement(this.container);
+			this.game.unregisterElement(this.escToQuit);
+			this.game.unregisterElement(this.points);
+			
+			this.container.parentNode.removeChild(this.container);
 		}
-	};
-	addEvent(document, 'keydown', eventKeydown);
-	
-	var eventKeypress = function(event) {
-		event = event || window.event;
-		if ( indexOf([code('up'), code('down'), code('right'), code('left'), code(' '), code('W'), code('A'), code('S'), code('D')], event.keyCode || event.which) != -1 ) {
-			if ( event.preventDefault )
-				event.preventDefault();
-			if ( event.stopPropagation )
-				event.stopPropagation();
-			event.returnValue = false;
-			event.cancelBubble = true;
-			return false;
-		}
-	};
-	addEvent(document, 'keypress', eventKeypress);
-	
-	var eventKeyup = function(event) {
-		event = event || window.event;
-		that.keysPressed[event.keyCode] = false;
-
-		if ( indexOf([code('up'), code('down'), code('right'), code('left'), code(' '), code('B'), code('W'), code('A'), code('S'), code('D')], event.keyCode) != -1 ) {
-			if ( event.preventDefault )
-				event.preventDefault();
-			if ( event.stopPropagation )
-				event.stopPropagation();
-			event.returnValue = false;
-			event.cancelBubble = true;
-			return false;
-		}
-	};
-	addEvent(document, 'keyup', eventKeyup);
+	});
 	
 	/*
-		Context operations
+		Class:
+			Player
+		
+		Keeps track of all the high-level stuff for a player.
+		
+		Each player is assigned it's own canvas that it's drawn on.
 	*/
 	
-	this.ctx.clear = function() {
-		this.clearRect(0, 0, w, h);
-	};
+	var PLAYERIDS = 0;
 	
-	this.ctx.clear();
-	
-	this.ctx.drawLine = function(xFrom, yFrom, xTo, yTo) {
-		this.beginPath();
-		this.moveTo(xFrom, yFrom);
-		this.lineTo(xTo, yTo);
-		this.lineTo(xTo + 1, yTo + 1);
-		this.closePath();
-		this.fill();
-	};
-	
-	this.ctx.tracePoly = function(verts) {
-		this.beginPath();
-		this.moveTo(verts[0][0], verts[0][1]);
-		for ( var i = 1; i < verts.length; i++ )
-			this.lineTo(verts[i][0], verts[i][1]);
-		this.closePath();
-	};
-	
-	var THEPLAYER = false;
-	if ( window.KICKASSIMG ) {
-		THEPLAYER = document.createElement('img');
-		THEPLAYER.src = window.KICKASSIMG;
-	}
-	
-	this.ctx.drawPlayer = function() {
-		if ( ! THEPLAYER ) {
-			this.save();
-			this.translate(that.pos.x, that.pos.y);
-			this.rotate(that.dir.angle());
-			this.tracePoly(playerVerts);
-			this.fillStyle = "white";
-			this.fill();
-			this.tracePoly(playerVerts);
-			this.stroke();
-			this.restore();
-		} else {
-			this.save();
-			this.translate(that.pos.x, that.pos.y);
-			this.rotate(that.dir.angle()+Math.PI/2);
-			this.drawImage(THEPLAYER, -THEPLAYER.width/2, -THEPLAYER.height/2);
-			this.restore();
+	var Player = new Class({
+		initialize: function() {
+			this.id = PLAYERIDS++;
+			
+			// Vertices for the player
+			// Remember that the ship should be pointing to the left
+			this.verts = [
+				[-10, 10],
+				[15, 0],
+				[-10, -10],
+				[-10, 10]
+			];
+			
+			this.size = {width: 20, height: 30};
+			
+			// Flame vertices
+			this.flames = {r: [], y: []};
+			
+			// The canvas for the ship, leave some room for the flames 
+			this.sheet = new Sheet(new Rect(100, 100, 50, 50));
+			
+			// Physics
+			this.pos = new Vector(100, 100);
+			this.vel = new Vector(0, 0);
+			this.acc = new Vector(0, 0);
+			this.dir = new Vector(1, 0);
+			this.currentRotation = 0;
+			
+			// Physics-related constants
+			this.friction = 0.8;
+			this.terminalVelocity = 2000;
+			
+			this.lastPos = new Vector(0, 0);
+			this.lastFrameUpdate = 0;
+			
+			this.generateFlames();
+		},
+		
+		update: function(tdelta) {
+			// Rotation
+			if ( this.game.isKeyPressed('left') || this.game.isKeyPressed('right') ) {
+				if ( this.game.isKeyPressed('left') )
+					this.rotateLeft();
+				if ( this.game.isKeyPressed('right') )
+					this.rotateRight();
+			} else {
+				this.stopRotate();
+			}
+			
+			// Activate thrusters!
+			if ( this.game.isKeyPressed('up') )
+				this.activateThrusters();
+			else
+				this.stopThrusters();
+			
+			// Add rotation
+			if ( this.currentRotation )
+				this.dir.setAngle(this.dir.angle() + this.currentRotation*tdelta);
+			
+			// Add acceleration to velocity
+			// The equation for the friction is:
+			//      velocity += acceleration - friction*velocity
+			// Found at: http://stackoverflow.com/questions/667034/simple-physics-based-movement
+			var frictionedAcc = this.acc.mulNew(tdelta).sub(this.vel.mulNew(tdelta*this.friction))
+			this.vel.add(frictionedAcc);
+			
+			// Cap velocity
+			if ( this.vel.len() > this.terminalVelocity )
+				this.vel.setLength(this.terminalVelocity);
+			
+			// Add velocity to position
+			this.pos.add(this.vel.mulNew(tdelta));
+			
+			// Update flames?
+			if ( now() - this.lastFrameUpdate > 1000/15 )
+				this.generateFlames();
+			
+			// Check bounds and update accordingly
+			this.checkBounds();
+			
+			// Only update canvas if any changes have occured
+			if ( ! this.lastPos.is(this.pos) || this.currentRotation ) {
+				// Draw changes onto canvas
+				this.sheet.clear();
+				this.sheet.setAngle(this.dir.angle());
+				this.sheet.setPosition(this.pos);
+				
+				// Draw flames if thrusters are activated
+				if ( ! this.acc.is({x: 0, y: 0}) ) {
+					this.sheet.drawFlames(this.flames);
+				}
+				
+				this.sheet.drawPlayer(this.verts);
+				
+				this.lastPos = this.pos.cp();
+			}
+		},
+		
+		/*
+			Method:
+				generateFlames
+			
+			Update flames every 0.2 seconds or something. Generates new flame
+			polygons for red/yellow
+		*/
+		
+		generateFlames: function() {
+			var rWidth = this.size.width,
+				rIncrease = this.size.width * 0.1,
+				yWidth = this.size.width * 0.6,
+				yIncrease = yWidth * 0.2,
+				halfR = rWidth / 2,
+				halfY = yWidth / 2,
+				halfPlayerHeight = this.size.height / 4;
+				
+			// Firstly recreate the flame vertice arrays
+			this.flames.r = [[-1 * halfPlayerHeight, -1 * halfR]];
+			this.flames.y = [[-1 * halfPlayerHeight, -1 * halfY]];
+
+			for ( var x = 0; x < rWidth; x += rIncrease )
+				this.flames.r.push([-random(2, 7) - halfPlayerHeight, x - halfR]);
+
+			this.flames.r.push([-1 * halfPlayerHeight, halfR]);
+			
+			// And the yellow flames
+			for ( var x = 0; x < yWidth; x += yIncrease )
+				this.flames.y.push([-random(2, 7) - halfPlayerHeight, x - halfY]);
+
+			this.flames.y.push([-1 * halfPlayerHeight, halfY]);
+		
+			this.lastFrameUpdate = now();
+		},
+		
+		/*
+			Method:
+				checkBounds
+			
+			Update the bounds so we don't encounter any strange scrollbars.
+			Scroll ship if it's out of bounds, or just move it to the other side
+		*/
+		
+		checkBounds: function() {
+			var w = this.game.windowSize.width;
+			var h = this.game.windowSize.height;
+			
+			// Because the sheet is larger than the ship itself setting it
+			// to the right most position can cause a scrollbar to appear
+			// therefor the right bound is the x-position, including half the sheet width
+			var rightBound = this.pos.x + this.sheet.rect.size.width/2;
+			var bottomBound = this.pos.y + this.sheet.rect.size.height/2;
+			
+			// Check bounds X
+			if ( rightBound > w ) {
+				window.scrollTo(this.game.scrollPos.x + 50, this.game.scrollPos.y);
+				this.pos.x = 0;
+			} else if ( this.pos.x < 0 ) {
+				window.scrollTo(this.game.scrollPos.x - 50, this.game.scrollPos.y);
+				this.pos.x = w - this.sheet.rect.size.width/2;
+			}
+			
+			// check bounds Y
+			if ( bottomBound > h ) {
+				window.scrollTo(this.game.scrollPos.x, this.game.scrollPos.y + h * 0.75);
+				this.pos.y = 0;
+			} else if ( this.pos.y < 0 ) {
+				window.scrollTo(this.game.scrollPos.x, this.game.scrollPos.y - h * 0.75);
+				this.pos.y = h - this.sheet.rect.size.height/2;
+			}
+		},
+		
+		// Activate and deactivate thrusters, thus accelerating the ship
+		activateThrusters: function() {
+			this.acc = (new Vector(500, 0)).setAngle(this.dir.angle());
+		},
+		
+		stopThrusters: function() {
+			this.acc = new Vector(0, 0);
+		},
+		
+		// Rotate left/right/stop rotation methods
+		rotateLeft: function() {
+			this.currentRotation = -Math.PI*2;
+		},
+		
+		rotateRight: function() {
+			this.currentRotation = Math.PI*2;
+		},
+		
+		stopRotate: function() {
+			this.currentRotation = 0;	
+		},
+		
+		destroy: function() {
+			this.sheet.destroy();
 		}
-	};
-	
-	var PI_SQ = Math.PI*2;
-	
-	this.ctx.drawBullets = function(bullets) {
-		for ( var i = 0; i < bullets.length; i++ ) {
-			this.beginPath();
-			this.arc(bullets[i].pos.x, bullets[i].pos.y, bulletRadius, 0, PI_SQ, true);
-			this.closePath();
-			this.fill();
-		}
-	};
-	
-	var randomParticleColor = function() {
-		return (['red', 'yellow'])[random(0, 1)];
-	};
-	
-	this.ctx.drawParticles = function(particles) {
-		var oldColor = this.fillStyle;
-		
-		for ( var i = 0; i < particles.length; i++ ) {
-			this.fillStyle = randomParticleColor();
-			this.drawLine(particles[i].pos.x, particles[i].pos.y, particles[i].pos.x - particles[i].dir.x * 10, particles[i].pos.y - particles[i].dir.y * 10);
-		}
-		
-		this.fillStyle = oldColor;
-	};
-	
-	this.ctx.drawFlames = function(flame) {
-		if ( THEPLAYER ) return;
-		
-		this.save();
-		
-		this.translate(that.pos.x, that.pos.y);
-		this.rotate(that.dir.angle());
-		
-		var oldColor = this.strokeStyle;
-		this.strokeStyle = "red";
-		this.tracePoly(flame.r);
-		this.stroke();
-		
-		this.strokeStyle = "yellow";
-		this.tracePoly(flame.y);
-		this.stroke();
-		
-		this.strokeStyle = oldColor;
-		this.restore();
-	}
+	});
 	
 	/*
-		Game loop
+		Class:
+			BulletManager
+		
+		Keeps track of all the bullets, collision detection, bullet life time
+		and those things.
 	*/
 	
-	// Attempt to focus window if possible, so keyboard events are posted to us
-	try {
-		window.focus();
-	} catch ( e ) {}
+	var BulletManager = new Class({
+		initialize: function() {
+			this.bullets = {};
+			this.lastFired = 0;
+			
+			this.lastBlink = 0;
+			this.blinkActive = false;
+			this.enemyIndex = [];
+		},
+		
+		update: function(tdelta) {
+			// If spacebar is pressed down, and only shoot every 0.1 second
+			if ( this.game.isKeyPressed(' ') && now() - this.lastFired > 100 ) {
+				for ( var i = 0, player; player = this.game.players[i]; i++ )
+					this.addBulletFromPlayer(player);
+				this.lastFired = now();
+			}
+			
+			// If B is pressed, show remaining enemies
+			if ( this.game.isKeyPressed('B') ) {
+				this.blink();
+			} else {
+				this.endBlink();
+			}
+			
+			for ( var key in this.bullets ) if ( this.bullets.hasOwnProperty(key) ) {
+				var time = now(); // the time... is now
+				
+				// Remove bullets older than 2 seconds
+				for ( var i = 0, bullet; bullet = this.bullets[key][i]; i++ ) {
+					if ( time - bullet.bornAt > 2000 ) {
+						bullet.destroy();
+						this.bullets[key].splice(i, 1);
+					}
+				}
+			
+				for ( var i = 0, bullet; bullet = this.bullets[key][i]; i++ ) {
+					bullet.update(tdelta);
+					
+					// Hide everything related to this game so it can't be hit
+					this.game.hideAll();
+					
+					var hit = bullet.checkCollision();
+					
+					// If we hit something remove the element, add an explosion and remove the bullet
+					if ( hit ) {
+						this.game.explosionManager.addExplosion(bullet.pos);
+						this.game.menuManager.addPoints(hit.getElementsByTagName('*').length + 1);
+						
+						hit.parentNode.removeChild(hit);
+						
+						bullet.destroy();
+						this.bullets[key].splice(i, 1);
+					}
+					
+					// Show it again
+					this.game.showAll();
+				}
+			}
+		},
+		
+		/*
+			Method:
+				blink
+			
+			Shows a red border around all remaining enemies every 0.25 seconds
+		*/
+		
+		blink: function() {
+			if ( now() - this.lastBlink > 250 ) {
+				for ( var i = 0, el; el = this.enemyIndex[i]; i++ ) {
+					if ( ! this.blinkActive )
+						el.style.outline = '1px solid red';
+					else
+						el.style.outline = el.KICKASSOLDBORDER;
+				}					
+				this.blinkActive = ! this.blinkActive;
+				this.lastBlink = now();
+				
+				if ( ! this.blinkActive ) {
+					this.updateEnemyIndex();
+				}
+			}
+		},
+		
+		/*
+			Method:
+				endBlink
+			
+			End any blinking action (if there is any)
+		*/
+		
+		endBlink: function() {
+			// endBlink is called every run loop if B isn't pressed, so only
+			// reset everything if there is something to reset
+			if ( this.enemyIndex.length ) {
+				for ( var i = 0, el; el = this.enemyIndex[i]; i++ )
+					el.style.outline = el.KICKASSOLDBORDER;
+				
+				this.enemyIndex = [];
+				this.lastBlink = 0;
+				this.blinkActive = false;
+			}
+		},
+		
+		/*
+			Method:
+				updateEnemyIndex
+			
+			Update index of destroyable enemies
+		*/
+		
+		updateEnemyIndex: function() {
+			var all = document.getElementsByTagName('*');
+			this.enemyIndex = [];
+			
+			for ( var i = 0, el; el = all[i]; i++ ) {
+				if ( this.hasOnlyTextualChildren(el) ) {
+					this.enemyIndex.push(el);
+					
+					el.KICKASSOLDBORDER = el.style.outline || (document.defaultView.getComputedStyle(el, null).outline);
+				}
+			}
+		},
+		
+		/*
+			Method:
+				addBulletFromPlayer
+			
+			Add bullet at the position of a player's cannon
+		*/
+		
+		addBulletFromPlayer: function(player) {
+			var pid = player.id;
+			
+			// If the player has more than 10 bullets, remove the oldest one
+			if (this.bullets[pid] && this.bullets[pid].length > 10 ) {
+				this.bullets[pid][0].destroy();
+				this.bullets[pid].shift();
+			}
+			
+			var bullet = new Bullet();
+			bullet.manager = this;
+			bullet.pos = player.pos.cp();
+			bullet.dir = player.dir.cp();
+			bullet.game = this.game;
+			
+			// Make sure the bullet is traveling faster than the player
+			bullet.vel.add(bullet.vel.cp().setLength(player.vel.len()));
+			
+			// Bullets are stored per ship, ensure we have an array for this ship
+			if ( ! this.bullets[pid] )
+				this.bullets[pid] = [];
+			
+			this.bullets[pid].push(bullet);
+		},
+		
+		/*
+			Method:
+				hasOnlyTextualChildren
+			
+			Find out if an element is suitable for destruction by checking if it
+			only has "textual" children. It wouldn't be too fun a game if you could
+			simply destroy the wrapper-div of a page on your first shot, right?
+		*/
+		
+		hasOnlyTextualChildren: function(element) {
+			if ( element == document.defaultView || element == document.body)
+				return false;
+			
+			if ( element.className && element.className.indexOf('KICKASSELEMENT') != -1 )
+				return false;
+			
+			for ( var i = 0; i < element.childNodes.length; i++ ) {
+				if (element.childNodes[i].childNodes[0]) {
+					var children = element.childNodes;
+					for ( var i = 0, child; child = children[i]; i++ ) {
+						if ( child.nodeType != 1 || child.style.visibility == 'hidden' || child.style.display == 'none' )
+							continue;
+						
+						if ( child.offsetHeight == 0 || child.offsetWidth == 0 )
+							continue;
+						
+						if ( ELEMENTSTHATCOUNTASTEXTUAL.indexOf(child.tagName) == -1 && ELEMENTSTHATARENOTTOBEINCLUDED.indexOf(child.tagName) == -1 )
+							return false;
+					}
+				}
+			}
+			return true;
+		},
+		
+		destroy: function() {
+			for ( var key in this.bullets ) if ( this.bullets.hasOwnProperty(key) ) 
+				for ( var i = 0, bullet; bullet = this.bullets[key][i]; i++ )
+					bullet.destroy();
+			this.bullets = {};
+		}
+	});
 	
-	addParticles(this.pos);
-	addClass(document.body, 'ASTEROIDSYEAH');
+	var ELEMENTSTHATCOUNTASTEXTUAL = ['BR', 'SELECT', 'LEGEND'];
+	var ELEMENTSTHATARENOTTOBEINCLUDED = ['BR', 'SCRIPT', 'STYLE', 'TITLE', 'META', 'HEAD', 'OPTION', 'OPTGROUP'];
+		
+	/*
+		Class:
+			Bullet
+		
+		Represents a bullet, and takes care of high-level bullet management.
+		Does not take care of collision detection. That's the BulletManager's
+		job.
+	*/
 	
-	var isRunning = true;
-	var lastUpdate = new Date().getTime();
+	var Bullet = new Class({
+		initialize: function() {
+			this.pos = new Vector(100, 100);
+			this.dir = new Vector(1, 1);
+			this.vel = new Vector(500, 500);
+			
+			this.bornAt = now();
+			
+			this.sheet = new Sheet(new Rect(this.pos.x, this.pos.y, 5, 5));
+			this.sheet.drawBullet();
+		},
+		
+		update: function(tdelta) {
+			this.pos.add(this.vel.setAngle(this.dir.angle()).mulNew(tdelta));
+			
+			this.checkBounds();
+			this.sheet.setPosition(this.pos);
+		},
+		
+		/*
+			Method:
+				checkCollision
+			
+			Get the element the bullet is currently over.
+			
+			Returns:
+				The element that the bullet is on, or false.
+		*/
+		
+		checkCollision: function() {
+			var element = document.elementFromPoint(this.pos.x, this.pos.y);
+			if ( element && element.nodeType == 3 )
+				element = element.parentNode;
+			return element && element != document.documentElement && this.manager.hasOnlyTextualChildren(element) ? element : false;
+		},
+				
+		// See: <Player.checkBounds>
+		checkBounds: function() {
+			var w = this.game.windowSize.width;
+			var h = this.game.windowSize.height;
+			
+			var rightBound = this.pos.x + this.sheet.rect.size.width/2;
+			var bottomBound = this.pos.y + this.sheet.rect.size.height/2;
+			
+			// Check bounds X
+			if ( rightBound > w )
+				this.pos.x = 0;
+			else if ( this.pos.x < 0 )
+				this.pos.x = w - this.sheet.rect.size.width/2;
+			
+			// Check bounds Y
+			if ( bottomBound > h )
+				this.pos.y = 0;
+			else if ( this.pos.y < 0 )
+				this.pos.y = h - this.sheet.rect.size.height/2;
+		},
+		
+		destroy: function() {
+			this.sheet.destroy();
+		}
+	});
 	
-	this.update = function() {
-		var forceChange = false;
+	/*
+		Class:
+			ExplosionManager
 		
-		// ==
-		// logic
-		// ==
-		var nowTime = new Date().getTime();
-		var tDelta = (nowTime - lastUpdate) / 1000;
-		lastUpdate = nowTime;
-		
-		// update flame and timer if needed
-		var drawFlame = false;
-		if ( nowTime - this.updated.flame > 50 ) {
-			createFlames();
-			this.updated.flame = nowTime;
-		}
-		
-		this.scrollPos.x = window.pageXOffset || document.documentElement.scrollLeft;
-		this.scrollPos.y = window.pageYOffset || document.documentElement.scrollTop;
-		
-		// update player
-		// move forward
-		if ( (this.keysPressed[code('up')]) || (this.keysPressed[code('W')]) ) {
-			this.vel.add(this.dir.mulNew(acc * tDelta));
-			
-			drawFlame = true;
-		} else {		
-			// decrease speed of player
-			this.vel.mul(0.96);
-		}
-		
-		// rotate counter-clockwise
-		if ( (this.keysPressed[code('left')]) || (this.keysPressed[code('A')]) ) {
-			forceChange = true;
-			this.dir.rotate(radians(rotSpeed * tDelta * -1));
-		}
-		
-		// rotate clockwise
-		if ( (this.keysPressed[code('right')]) || (this.keysPressed[code('D')]) ) {
-			forceChange = true;
-			this.dir.rotate(radians(rotSpeed * tDelta));
-		}
-		
-		// fire
-		if ( this.keysPressed[code(' ')] && nowTime - this.firedAt > timeBetweenFire ) {
-			this.bullets.unshift({
-				'dir': this.dir.cp(),
-				'pos': this.pos.cp(),
-				'startVel': this.vel.cp(),
-				'cameAlive': nowTime
-			});
-			
-			this.firedAt = nowTime;
-			
-			if ( this.bullets.length > maxBullets ) {
-				this.bullets.pop();
-			}
-		}
-		
-		// add blink
-		if ( this.keysPressed[code('B')] ) {
-			if ( ! this.updated.enemies ) {
-				updateEnemyIndex();
-				this.updated.enemies = true;
-			}
-			
-			forceChange = true;
-			
-			this.updated.blink.time += tDelta * 1000;
-			if ( this.updated.blink.time > timeBetweenBlink ) {
-				this.toggleBlinkStyle();
-				this.updated.blink.time = 0;
-			}
-		} else {
-			this.updated.enemies = false;
-		}
-		
-		if ( this.keysPressed[code('esc')] ) {
-			destroy.apply(this);
-			return;
-		}
-		
-		// cap speed
-		if ( this.vel.len() > maxSpeed ) {
-			this.vel.setLength(maxSpeed);
-		}
-		
-		// add velocity to player (physics)
-		this.pos.add(this.vel.mulNew(tDelta));
-		
-		// check bounds X of player, if we go outside we scroll accordingly
-		if ( this.pos.x > w ) {
-			window.scrollTo(this.scrollPos.x + 50, this.scrollPos.y);
-			this.pos.x = 0;
-		} else if ( this.pos.x < 0 ) {
-			window.scrollTo(this.scrollPos.x - 50, this.scrollPos.y);
-			this.pos.x = w;
-		}
-		
-		// check bounds Y
-		if ( this.pos.y > h ) {
-			window.scrollTo(this.scrollPos.x, this.scrollPos.y + h * 0.75);
-			this.pos.y = 0;
-		} else if ( this.pos.y < 0 ) {
-			window.scrollTo(this.scrollPos.x, this.scrollPos.y - h * 0.75);
-			this.pos.y = h;
-		}
-		
-		// update positions of bullets
-		for ( var i = this.bullets.length - 1; i >= 0; i-- ) {
-			// bullets should only live for 2 seconds
-			if ( nowTime - this.bullets[i].cameAlive > 2000 ) {
-				this.bullets.splice(i, 1);
-				forceChange = true;
-				continue;
-			}
-			
-			var bulletVel = this.bullets[i].dir.setLengthNew(bulletSpeed * tDelta).add(this.bullets[i].startVel.mulNew(tDelta));
-			
-			this.bullets[i].pos.add(bulletVel);
-			boundsCheck(this.bullets[i].pos);
-			
-			// check collisions
-			var murdered = getElementFromPoint(this.bullets[i].pos.x, this.bullets[i].pos.y);
-			if (
-				murdered && murdered.tagName &&
-				indexOf(ignoredTypes, murdered.tagName.toUpperCase()) == -1 &&
-				hasOnlyTextualChildren(murdered) && murdered.className != "ASTEROIDSYEAH"
-			) {
-				didKill = true;
-				addParticles(this.bullets[i].pos);
-				this.dying.push(murdered);
-			
-				this.bullets.splice(i, 1);
-				continue;
-			}
-		}
-		
-		if (this.dying.length) {
-			for ( var i = this.dying.length - 1; i >= 0; i-- ) {
-				try {
-					// If we have multiple spaceships it might have already been removed
-					if ( this.dying[i].parentNode )
-						window.ASTEROIDS.enemiesKilled++;
-
-					this.dying[i].parentNode.removeChild(this.dying[i]);
-				} catch ( e ) {}
-			}
-
-			setScore();
-			this.dying = [];
-		}
-
-		// update particles position
-		for ( var i = this.particles.length - 1; i >= 0; i-- ) {
-			this.particles[i].pos.add(this.particles[i].dir.mulNew(particleSpeed * tDelta * Math.random()));
-			
-			if ( nowTime - this.particles[i].cameAlive > 1000 ) {
-				this.particles.splice(i, 1);
-				forceChange = true;
-				continue;
-			}
-		}
-		
-		// ==
-		// drawing
-		// ==
-		
-		// Reposition the canvas area for IE quirks because it does not understand position: fixed
-		if ( isIEQuirks ) {
-			this.gameContainer.style.left =
-				this.canvas.style.left = document.documentElement.scrollLeft + "px";
-			this.gameContainer.style.top =
-				this.canvas.style.top = document.documentElement.scrollTop + "px";
-			
-			this.navigation.style.right = "10px";
-			this.navigation.style.top
-				= document.documentElement.scrollTop + document.body.clientHeight - this.navigation.clientHeight - 10 + "px";
-		}
-		
-		// clear
-		if ( forceChange || this.bullets.length != 0 || this.particles.length != 0 || ! this.pos.is(this.lastPos) || this.vel.len() > 0 ) {
-			this.ctx.clear();
-			
-			// draw player
-			this.ctx.drawPlayer();
-			
-			// draw flames
-			if ( drawFlame )
-				this.ctx.drawFlames(that.flame);
-			
-			// draw bullets
-			if (this.bullets.length) {
-				this.ctx.drawBullets(this.bullets);
-			}
-			
-			// draw particles
-			if (this.particles.length) {
-				this.ctx.drawParticles(this.particles);
-			}
-		}
-		this.lastPos = this.pos;
-	}
+		Manager for explosions. 
+	*/
 	
-	// Start timer
-	var updateFunc = function() {
-		try {
-			that.update.call(that);
+	var ExplosionManager = new Class({
+		initialize: function() {
+			this.explosions = [];
+		},
+		
+		update: function(tdelta) {
+			var time = now();
+			
+			for ( var i = 0, explosion; explosion = this.explosions[i]; i++ ) {
+				// Remove explosions older than 0.3 seconds
+				if ( time - explosion.bornAt > 300 ) {
+					explosion.destroy();
+					this.explosions.splice(i, 1);
+					continue;
+				}
+				
+				// Update it
+				explosion.update(tdelta);
+			}
+		},
+		
+		/*
+			Method:
+				addExplosion
+			
+			Add explosion at the center of a point.
+			
+			Parameters:
+				(Vector) pos - The position of the explosion
+		*/
+		
+		addExplosion: function(pos) {
+			var explosion = new Explosion(pos);
+			explosion.game = this.game;
+			explosion.checkBounds();
+			
+			this.explosions.push(explosion);
+		},
+		
+		destroy: function() {
+			for ( var i = 0, explosion; explosion = this.explosions[i]; i++ )
+				explosion.destroy();
+			this.explosions = [];
 		}
-		catch (e) {
-			clearInterval(interval);
-			throw e;
+	});
+	
+	/*
+		Class:
+			Explosion
+		
+		Class that represents an explosion. The drawing, lifetime, etc
+	*/
+	
+	var Explosion = new Class({
+		initialize: function(pos) {
+			this.bornAt = now();
+			this.pos = pos.cp();
+			this.particleVel = new Vector(400, 0);
+			
+			this.generateParticles();
+			
+			this.sheet = new Sheet(new Rect(pos.x, pos.y, 250, 250));
+		},
+		
+		update: function(tdelta) {
+			var vel = this.particleVel.mulNew(tdelta);
+			
+			for ( var i = 0, particle; particle = this.particles[i]; i++ )
+				particle.pos.add( particle.vel.mulNew(tdelta).mul(random(0.5, 1.0)).setAngle(particle.dir.angle()) );
+			
+			this.sheet.clear();
+			this.sheet.drawExplosion(this.particles);
+		},
+		
+		/*
+			Method:
+				generateParticles
+			
+			Generate around 30 particles that fly in a random direction
+		*/
+		
+		generateParticles: function() {
+			this.particles = [];
+			
+			// Generate 
+			for ( var i = 0, j = (typeof Raphael != 'undefined') ? 10 : 40; i < j; i++ ) {
+				this.particles.push({
+					dir: (new Vector(random(0, 20)-10, random(0, 20)-10)).normalize(),
+					vel: this.particleVel.cp(),
+					pos: new Vector(0, 0)
+				});
+			}
+		},
+		
+		/*
+			Method:
+				checkBounds
+			
+			This is just a quick test to see if the sheet is outside of the window
+			if it is, we just adjust it so it doesn't cause any scrollbars.
+		*/
+		
+		checkBounds: function() {
+			// Just do a quick bounds check on the sheet
+			var right = this.sheet.rect.getRight();
+			var bottom = this.sheet.rect.getBottom();
+			
+			var w = this.game.windowSize.width;
+			var h = this.game.windowSize.height;
+			
+			if ( right > w )
+				this.pos.x -= right - w;
+			if ( bottom > h )
+				this.pos.y -= bottom - h;
+			
+			this.sheet.setPosition(this.pos);
+		},
+		
+		destroy: function() {
+			this.sheet.destroy();
 		}
+	});
+	
+	/*
+		Class:
+			Sheet
+		
+		Abstraction for choosing between Raphael or canvas when drawing things.
+	*/
+	
+	var Sheet = new Class({
+		initialize: function(rect) {
+			this.rect = rect;
+			
+			if ( typeof Raphael != 'undefined' )
+				this.drawer = new SheetRaphael(rect);
+			else
+				this.drawer = new SheetCanvas(rect);
+		},
+		
+		/*
+			Method:
+				clear
+			Clear the sheet to a initial blank state
+		*/
+		
+		clear: function() {
+			this.drawer.clear();
+		},
+		
+		/*
+			Method:
+				setPosition
+		*/
+		
+		setPosition: function(pos) {
+			this.rect.pos = pos.cp();
+			this.drawer.rect = this.rect;
+			this.drawer.updateCanvas();
+		},
+		
+		
+		/*
+			Method:
+				setAngle
+			Set the angle used when drawing things
+		*/
+		
+		setAngle: function(angle) {
+			this.drawer.setAngle(angle);
+		},
+		
+		/*
+			Method:
+				drawPlayer
+			
+			Specialised method for drawing the player. Takes the verts
+			and draws it with a black border around a white body
+		*/
+		
+		drawPlayer: function(verts) {
+			this.drawer.setFillColor('white');
+			this.drawer.setStrokeColor('black');
+			this.drawer.setLineWidth(1.5);
+			
+			this.drawer.tracePoly(verts);
+			this.drawer.fillPath();
+			
+			this.drawer.tracePoly(verts);
+			this.drawer.strokePath();
+		},
+		
+		/*
+			Method:
+				drawFlames
+			
+			Specialised method for drawing flames.
+			
+			Parameters:
+				(object) flames - An object with an r- and y-property, 
+									containing arrays of vertices
+		*/
+		
+		drawFlames: function(flames) {
+			this.drawer.setStrokeColor('red');
+			this.drawer.tracePoly(flames.r);
+			this.drawer.strokePath();
+			
+			this.drawer.setStrokeColor('yellow');
+			this.drawer.tracePoly(flames.y);
+			this.drawer.strokePath();
+		},
+		
+		/*
+			Method:
+				drawBullet
+			
+			Specialised method for drawing a bullet. It's basically just a circle.
+		*/
+		
+		drawBullet: function() {
+			this.drawer.setFillColor('black');
+			this.drawer.drawCircle(2.5);
+		},
+		
+		/*
+			Method:
+				drawExplosion
+			
+			Specialised method for drawing explosions.
+			
+			Parameters:
+				(array) particles - An array of particles. These particles are actually
+										objects with a pos-property (among other things)
+		*/
+		
+		drawExplosion: function(particles) {
+			for ( var i = 0, particle; particle = particles[i]; i++ ) {
+				// Set a random particle color
+				this.drawer.setFillColor(['yellow', 'red'][random(0, 1)]);
+				this.drawer.drawLine(particle.pos.x, particle.pos.y, particle.pos.x - particle.dir.x * 10, particle.pos.y - particle.dir.y * 10);
+			}
+		},
+		
+		destroy: function() {
+			this.drawer.destroy();
+		}
+	});
+	
+	/*
+		Class:
+			SheetRaphael
+		
+		Abstracts a lot of the drawing to Raphael SVG
+	*/
+	
+	var SheetRaphael = new Class({
+		initialize: function(rect) {
+			this.rect = rect;
+			
+			this.fillColor = 'black';
+			this.strokeColor = 'black';
+			this.lineWidth = 1.0;
+			this.polyString = '';
+			
+			this.raphael = Raphael(this.rect.pos.x-this.rect.size.width/2, this.rect.pos.y-this.rect.size.height/2, this.rect.size.width, this.rect.size.height);
+			this.raphael.canvas.style.zIndex = '10000';
+			this.raphael.canvas.className = 'KICKASSELEMENT';
+			
+			// -- bad style?
+			window.KICKASSGAME.registerElement(this.raphael.canvas);
+			// --
+		},
+		
+		// See: <SheetCanvas>
+		tracePoly: function(verts) {
+			// Nothing to draw
+			if ( ! verts[0] ) return;
+			
+			this.polyString = 'M' + verts[0][0] + ' ' + verts[0][1];
+			for ( var i = 0; i < verts.length; i++ )
+				this.polyString += 'L' + verts[i][0] + ' ' + verts[i][1];
+		},
+		
+		// See: <SheetCanvas>
+		setAngle: function(angle) {
+			this.angle = angle;
+		},
+		
+		// See: <SheetCanvas>
+		updateCanvas: function() {
+			this.raphael.canvas.width = this.rect.size.width;
+			this.raphael.canvas.height = this.rect.size.height;
+			
+			this.raphael.canvas.style.left = window.KICKASSGAME.scrollPos.x + (this.rect.pos.x - this.rect.size.width/2) + 'px';
+			this.raphael.canvas.style.top = window.KICKASSGAME.scrollPos.y + (this.rect.pos.y - this.rect.size.height/2) + 'px';
+		},
+		
+		// See: <SheetCanvas>
+		drawLine: function(xFrom, yFrom, xTo, yTo) {
+			this.tracePoly([[xFrom, yFrom], [xTo, yTo]]);
+			this.fillPath();
+		},
+		
+		// See: <SheetCanvas>
+		drawCircle: function(radius, pos) {
+			pos = pos || {x: 0, y: 0};
+			this.currentElement = this.raphael.circle(pos.x, pos.y, radius);
+			this.currentElement.attr('fill', this.fillColor);
+		},
+		
+		// See: <SheetCanvas>
+		setFillColor: function(color) {
+			this.fillColor = color;
+		},
+		
+		// See: <SheetCanvas>
+		setStrokeColor: function(color) {
+			this.strokeColor = color;
+		},
+		
+		// See: <SheetCanvas>
+		setLineWidth: function(width) {
+			this.lineWidth = width;
+		},
+		
+		// See: <SheetCanvas>
+		fillPath: function() {
+			this.currentElement = this.raphael.path(this.polyString);
+			this.currentElement.translate(this.rect.size.width/2, this.rect.size.height/2);
+			this.currentElement.attr('fill', this.fillColor);
+			this.currentElement.attr('stroke', this.fillColor);
+			this.currentElement.rotate(Raphael.deg(this.angle), this.rect.size.width/2, this.rect.size.height/2);
+		},
+		
+		// See: <SheetCanvas>
+		strokePath: function() {
+			this.currentElement = this.raphael.path(this.polyString);
+			this.currentElement.attr('stroke', this.strokeColor);
+			this.currentElement.attr('stroke-width', this.lineWidth);
+			this.currentElement.translate(this.rect.size.width/2, this.rect.size.height/2);
+			this.currentElement.rotate(Raphael.deg(this.angle), this.rect.size.width/2, this.rect.size.height/2);
+		},
+		
+		// See: <SheetCanvas>
+		clear: function() {
+			this.raphael.clear();
+		},
+		
+		destroy: function()  {
+			// -- Bad style?
+			window.KICKASSGAME.unregisterElement(this.raphael.canvas);
+			// --
+			
+			this.raphael.remove();
+		}
+	});
+	
+	/*
+		Class:
+			SheetCanvas
+		
+		Abstracts a lot of the canvas drawing into a "sheet". 
+	*/
+	
+	var SheetCanvas = new Class({
+		/*
+			Constructor
+			
+			Parameters:
+				(Rect) rect - The size and position of the element. The position is the element's center 
+		*/
+		
+		initialize: function(rect) {
+			this.canvas = document.createElement('canvas');
+			this.canvas.className = 'KICKASSELEMENT';
+			with ( this.canvas.style ) {
+				position = 'absolute';
+				zIndex = '1000000';
+			}
+			
+			// -- Bad style?
+			window.KICKASSGAME.registerElement(this.canvas);
+			// --
+			
+			if ( this.canvas.getContext )
+				this.ctx = this.canvas.getContext('2d');
+			
+			this.rect = rect;
+			this.angle = 0;
+			
+			this.updateCanvas();
+			(document.body).appendChild(this.canvas);
+		},
+		
+		/*
+			Method:
+				tracePoly
+			
+			Add points that will be drawn with <fillPath> or <strokePath>
+		*/
+		
+		tracePoly: function(verts) {
+			// Nothing to draw
+			if ( ! verts[0] ) return;
+			
+			// Move to center of canvas and rotate the coordinate system
+			this.ctx.save();
+			this.ctx.translate(this.rect.size.width/2, this.rect.size.height/2);
+			this.ctx.rotate(this.angle);
+			
+			// Trace every vertice
+			this.ctx.beginPath();
+			this.ctx.moveTo(verts[0][0], verts[0][1]);
+			for ( var i = 0; i < verts.length; i++ )
+				this.ctx.lineTo(verts[i][0], verts[i][1]);
+			
+			this.ctx.restore();
+		},
+		
+		/*
+			Method:
+				setAngle
+			Set the angle used when drawing things
+		*/
+		
+		setAngle: function(angle) {
+			this.angle = angle;
+		},
+		
+		/*
+			Method:
+				updateCanvas
+			
+			Update the position and size of the current canvas element
+		*/
+		
+		updateCanvas: function() {
+			if ( this.canvas.width != this.rect.size.width )
+				this.canvas.width = this.rect.size.width;
+			if ( this.canvas.height != this.rect.size.height )
+				this.canvas.height = this.rect.size.height;
+			
+			this.canvas.style.left = window.KICKASSGAME.scrollPos.x + (this.rect.pos.x - this.rect.size.width/2) + 'px';
+			this.canvas.style.top = window.KICKASSGAME.scrollPos.y + (this.rect.pos.y - this.rect.size.height/2) + 'px';
+		},
+		
+		/*
+			Method:
+				drawLine
+			
+			Draw a not-so-liney line.
+			
+			Parameters:
+				(number) xFrom - The x starting coordinate
+				(number) yFrom - The y starting coordinate
+				(number) xTo - The x end coordinate
+				(number) yTo - The y end coordinate
+		*/
+		
+		drawLine: function(xFrom, yFrom, xTo, yTo) {
+			this.ctx.save();
+			this.ctx.translate(this.rect.size.width/2, this.rect.size.height/2);
+			
+			this.ctx.beginPath();
+			this.ctx.moveTo(xFrom, yFrom);
+			this.ctx.lineTo(xTo, yTo);
+			this.ctx.lineTo(xTo + 2, yTo + 2);
+			this.ctx.closePath();
+			this.ctx.fill();
+			
+			this.ctx.restore();
+		},
+		
+		/*
+			Method:
+				drawCircle
+			
+			Draw circle at the center (or at a given point) of the sheet with a given radius
+			
+			Parameters:
+				(number) radius - The radius of the circle
+				(Vector, optional) pos - The position of the circle. Defaults to center
+		*/
+		
+		drawCircle: function(radius, pos) {
+			pos = pos || {x: 0, y: 0};
+			
+			this.ctx.save();
+			this.ctx.translate(this.rect.size.width/2, this.rect.size.height/2);
+			this.ctx.arc(0, 0, radius, 0, Math.PI*2, true);
+			this.ctx.restore();
+			this.ctx.fill();
+		},
+		
+		/*
+			Method:
+				setFillColor
+			Set the color used when filling with <fillPath>
+		*/
+		
+		setFillColor: function(color) {
+			this.ctx.fillStyle = color;
+		},
+		
+		/*
+			Method:
+				setStrokeColor
+			Set the border color for when using <strokePath>
+		*/
+		
+		setStrokeColor: function(color) {
+			this.ctx.strokeStyle = color;
+		},
+		
+		/*
+			Method:
+				setLineWidth
+			Set the line width of the border when using <strokePath>
+		*/
+		
+		setLineWidth: function(width) {
+			this.ctx.lineWidth = width;
+		},
+		
+		/*
+			Method:
+				fillPath
+			Fill the current path
+		*/
+		
+		fillPath: function() {
+			this.ctx.fill();
+		},
+		
+		/*
+			Method:
+				strokePath
+			Add a border around the current path
+		*/
+		
+		strokePath: function() {
+			this.ctx.stroke();
+		},
+		
+		/*
+			Method:
+				clear
+			Clear the sheet (canvas) to it's initial blank state
+		*/
+		
+		clear: function() {
+			this.ctx.clearRect(0, 0, this.rect.size.width, this.rect.size.height);
+		},
+		
+		destroy: function()  {
+			// -- Bad style?
+			window.KICKASSGAME.unregisterElement(this.canvas);
+			// --
+			
+			this.canvas.parentNode.removeChild(this.canvas);
+		}
+	});
+	
+	var initKickAss = function() {
+		// If an instance of KickAss is already present, we add a player
+		if ( ! window.KICKASSGAME ) {
+			window.KICKASSGAME = new KickAss();
+			window.KICKASSGAME.begin();
+		} else
+			window.KICKASSGAME.addPlayer();
 	};
-	var interval = setInterval(updateFunc, 1000 / FPS);
 	
-	function destroy() {
-		removeEvent(document, 'keydown', eventKeydown);
-		removeEvent(document, 'keypress', eventKeypress);
-		removeEvent(document, 'keyup', eventKeyup);
-		removeEvent(window, 'resize', eventResize);
-		isRunning = false;
-		removeStylesheet("ASTEROIDSYEAHSTYLES");
-		removeClass(document.body, 'ASTEROIDSYEAH');
-		this.gameContainer.parentNode.removeChild(this.gameContainer);
-	};
-}
-
-if ( ! window.ASTEROIDSPLAYERS )
-	window.ASTEROIDSPLAYERS = [];
-
-if ( window.ActiveXObject && ! document.createElement('canvas').getContext ) {
-	try {
-		var xamlScript = document.createElement('script');
-		xamlScript.setAttribute('type', 'text/xaml');
-		xamlScript.textContent = '<?xml version="1.0"?><Canvas xmlns="http://schemas.microsoft.com/client/2007"></Canvas>';
-		document.getElementsByTagName('head')[0].appendChild(xamlScript);
-	} catch ( e ) {}
-
-	var script = document.createElement("script");
-	script.setAttribute('type', 'text/javascript');
-	script.onreadystatechange = function() {
-		if ( script.readyState == 'loaded' || script.readyState == 'complete' ) {
-			if ( typeof G_vmlCanvasManager != "undefined" )
-				window.ASTEROIDSPLAYERS[window.ASTEROIDSPLAYERS.length] = new Asteroids();
-		}
-	};
-	script.src = "http://erkie.github.com/excanvas.js";
-	document.getElementsByTagName('head')[0].appendChild(script);
-}
-else window.ASTEROIDSPLAYERS[window.ASTEROIDSPLAYERS.length] = new Asteroids();
-
+	// No canvas support? Try Raphaël
+	if ( ! document.createElement('canvas').getContext ) {
+		var script = document.createElement('script');
+		script.setAttribute('type', 'text/javascript');
+		script.onreadystatechange = function() {
+			if ( script.readyState == 'loaded' || script.readyState == 'complete' )
+				initKickAss();
+		};
+		script.onload = initKickAss;
+		script.src = 'http://cdnjs.cloudflare.com/ajax/libs/raphael/1.5.2/raphael-min.js';
+		document.getElementsByTagName('head')[0].appendChild(script);
+	} else
+		initKickAss();
 })();
