@@ -692,6 +692,20 @@
 			this.escToQuit.className = 'KICKASSELEMENT';
 			this.escToQuit.innerHTML = 'Press esc to quit';
 			this.container.appendChild(this.escToQuit);
+
+            // Facebook and Twitter buttons
+            this.social = document.createElement('div');
+            this.social.className = 'KICKASSELEMENT';
+
+            document.body.appendChild(this.social);
+
+            with ( this.social.style ) {
+                position = 'fixed';
+                top = '20px';
+                right = '20px';
+                zIndex = '100000';
+                textAlign = 'right';
+            }
 			
 			this.game.registerElement(this.container);
 			this.game.registerElement(this.points);
