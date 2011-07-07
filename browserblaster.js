@@ -649,6 +649,9 @@
 			
 			// Stop game timer
 			clearInterval(this.loopTimer);
+
+            // Temporary:
+            window.location.reload();
 		}
 	});
 	
@@ -707,7 +710,6 @@
                 zIndex = '100000';
                 textAlign = 'right';
             }
-
             
             this.social.innerHTML = '<iframe src="http://www.facebook.com/plugins/like.php?href=' + encodeURIComponent(window.location.href) + '&amp;send=false&amp;layout=button_count&amp;width=450&amp;show_faces=true&amp;action=like&amp;colorscheme=light&amp;font&amp;height=21" scrolling="no" frameborder="0" style="display: block; position: absolute; right: 120px; border:none; overflow:hidden; width:100px; height:21px;" allowTransparency="true"></iframe>' +
             (/^https/.test(window.location.href) ? '' : '<a href="http://twitter.com/share" class="twitter-share-button" data-text="I found the secret code and played #browserblaster on ' + window.location.href + '. Can you find the code?" data-count="horizontal" data-related="cloudflare:CloudFlare: Performance and Security for Any Website">Tweet</a>');
